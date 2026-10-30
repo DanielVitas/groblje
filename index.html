@@ -11,6 +11,8 @@
 @media (prefers-color-scheme:dark){:root{--bg:#171916;--panel:#23261f;--fg:#ecebe4;--muted:#a3a69a;--line:#3a3e35;--accent:#f0a040;--me:#5ea0ff;--danger:#f28b82;color-scheme:dark}}
 *{box-sizing:border-box}[hidden]{display:none!important}
 html,body{height:100%;margin:0}
+@supports (height:100dvh){html,body{height:100dvh}}
+body{position:relative}
 body{background:var(--bg);color:var(--fg);font:15px/1.4 var(--font);overflow:hidden;-webkit-tap-highlight-color:transparent}
 #map{position:absolute;inset:0;background:#2b2f28}
 button{font:inherit;color:inherit;cursor:pointer}
@@ -291,6 +293,7 @@ window.initMap = function(){
 
   /* ---- list, export, import, save copy ---- */
   $("btnList").addEventListener("click", ()=>{
+    if(!$("sheet").hidden && $("shTitle").textContent==="Grobovi"){ closeSheet(); return; }
     openSheet("Grobovi"); const b=$("shBody");
     const items=[...store.graves].sort((x,y)=>(x.names||"").localeCompare(y.names||"","hr"));
     if(!items.length) b.append(el("div",{class:"note"},"Još nema označenih grobova."));
