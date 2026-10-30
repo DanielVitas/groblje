@@ -75,6 +75,12 @@ input[type=range]{width:100%}
 .setup ol{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:6px}
 .setup code{background:var(--panel);padding:1px 5px;border-radius:4px}
 .err{color:var(--danger);font-size:14px}
+.place{position:absolute;inset:0;z-index:13;touch-action:none;cursor:move}
+.placebar{position:absolute;z-index:14;left:0;right:0;bottom:0;background:var(--panel);border-radius:16px 16px 0 0;box-shadow:0 -4px 20px rgba(0,0,0,.25);padding:12px max(16px,env(safe-area-inset-right,0px)) calc(14px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px));display:flex;flex-direction:column;gap:10px}
+@media (min-width:760px){.placebar{left:auto;right:12px;bottom:12px;width:390px;border-radius:14px}}
+.placebar .ph{font-size:13px;color:var(--muted)}
+.placebar .psz{font-weight:600;font-variant-numeric:tabular-nums;min-width:96px}
+.placebar .row .grow{flex:1}
 @media (prefers-reduced-motion:reduce){.banner svg{transition:none}}
 </style>
 </head>
@@ -90,7 +96,14 @@ input[type=range]{width:100%}
   <div><b id="gName"></b><span id="gDist"></span></div>
   <button class="x" type="button" id="gClose" aria-label="Prekini">✕</button>
 </div>
-<div class="banner hint" id="hint" hidden><span style="color:#fff">Dodirnite grob na slici</span><button type="button" id="hintCancel">Odustani</button></div>
+<div class="place" id="place" hidden></div>
+<div class="placebar" id="placebar" hidden>
+  <div class="ph">Povucite prstom za premik. Razmaknite ili stisnite dva prsta za veličinu (vodoravno = širina, okomito = dužina).</div>
+  <div class="row"><span class="psz" id="pSize"></span>
+    <button class="btn sm" type="button" data-d="w-" aria-label="Uži">↔ −</button><button class="btn sm" type="button" data-d="w+" aria-label="Širi">↔ +</button>
+    <button class="btn sm" type="button" data-d="l-" aria-label="Kraći">↕ −</button><button class="btn sm" type="button" data-d="l+" aria-label="Duži">↕ +</button></div>
+  <div class="row"><button class="btn grow" type="button" id="pCancel">Odustani</button><button class="btn pri grow" type="button" id="pOk">Dodaj</button></div>
+</div>
 <div class="fab-col" id="fabs" hidden>
   <button class="fab" id="btnLocate" type="button" title="Moja lokacija" aria-label="Moja lokacija"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/><circle cx="12" cy="12" r="8"/></svg></button>
   <button class="fab add" id="btnAdd" type="button" title="Označi grob" aria-label="Označi grob"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M12 5v14M5 12h14"/></svg></button>
@@ -120,7 +133,7 @@ input[type=range]{width:100%}
 
 <script>
 /* ---- Data that travels with this file. "Spremi kopiju" rewrites the block between the markers. ---- */
-const SAVED = /*DATA-START*/{"key": "AIzaSyCjBcEOTSjJ3ZmZj2GcOE11qiL_uhPO8lg", "graves": [{"id": "primjer1", "names": "Primjer 1", "years": "1921 – 1987", "note": "Primjer groba – obrišite ga kad dodate prave.", "label": "", "lat": 45.618816, "lng": 18.53688, "w": 2.2, "l": 2.8, "rot": 0, "color": "#f0a040"}, {"id": "primjer2", "names": "Primjer 2\nPrimjer 3", "years": "1930 – 2004", "note": "Primjer groba s dvije osobe.", "label": "", "lat": 45.61917, "lng": 18.536815, "w": 2.2, "l": 2.8, "rot": 0, "color": "#4fa3f7"}, {"id": "primjer3", "names": "Primjer 4", "years": "1948 – 2015", "note": "Primjer groba – obrišite ga kad dodate prave.", "label": "", "lat": 45.61891, "lng": 18.536463, "w": 2.2, "l": 2.8, "rot": 0, "color": "#e8505b"}]}/*DATA-END*/;
+const SAVED = /*DATA-START*/{"key": "AIzaSyCjBcEOTSjJ3ZmZj2GcOE11qiL_uhPO8lg", "graves": [{"id": "primjer1", "names": "Primjer 1", "years": "1921 – 1987", "note": "Primjer groba – obrišite ga kad dodate prave.", "label": "", "lat": 45.618816, "lng": 18.53688, "w": 2.2, "l": 2.8, "rot": 0, "color": "#f0a040"}, {"id": "primjer2", "names": "Primjer 2\nPrimjer 3", "years": "1930 – 2004", "note": "Primjer groba s dvije osobe.", "label": "", "lat": 45.61917, "lng": 18.536815, "w": 2.2, "l": 2.8, "rot": 0, "color": "#f0a040"}, {"id": "primjer3", "names": "Primjer 4", "years": "1948 – 2015", "note": "Primjer groba – obrišite ga kad dodate prave.", "label": "", "lat": 45.61891, "lng": 18.536463, "w": 2.2, "l": 2.8, "rot": 0, "color": "#f0a040"}]}/*DATA-END*/;
 /* Petrijevci cemetery, OpenStreetMap way 177134136 (centre). */
 const CENTER = {lat:45.61895, lng:18.53700};
 /* Area the map may show: the cemetery plus ~30 m around it. */
@@ -132,6 +145,7 @@ let PAGE_SOURCE = null; // set by the last script, before anything changes the p
 const $ = id => document.getElementById(id);
 const LS = "groblje-petrijevci-google-v1";
 const COLORS = ["#f0a040","#e8505b","#4fa3f7","#5cc46a","#b07cf0"];
+const GRAVE_COLOR = "#f0a040";
 let store = {key:"", graves:[]};
 try{ const s = JSON.parse(localStorage.getItem(LS)||"null"); if(s) store = s; }catch(e){}
 // graves baked into the file are added if this browser does not have them yet
@@ -191,12 +205,12 @@ window.initMap = function(){
 
   const shapes = new Map(); // id -> {poly, label}
   let selected=null, moving=null;
-  function polyOpts(g){ const s=g.id===selected; return {paths:corners(g), strokeColor:s?"#ffffff":g.color, strokeWeight:s?3:2, fillColor:g.color, fillOpacity:s?.55:.4, clickable:true, draggable:g.id===moving, zIndex:s?10:1}; }
+  function polyOpts(g){ const s=g.id===selected, c=g.color||GRAVE_COLOR; return {paths:corners(g), strokeColor:s?"#ffffff":c, strokeWeight:s?3:2, fillColor:c, fillOpacity:s?.55:.4, clickable:true, draggable:g.id===moving, zIndex:s?10:1}; }
   function draw(g){
     let sh = shapes.get(g.id);
     if(!sh){
       const poly = new google.maps.Polygon(polyOpts(g)); poly.setMap(map);
-      poly.addListener("click", ()=>{ if(!placing) openGrave(g.id); });
+      poly.addListener("click", ()=>{ if(!placeG) openGrave(g.id); });
       poly.addListener("dragend", ()=>{ // new centre = mean of dragged corners
         const p=poly.getPath().getArray(); g.lat=p.reduce((s,x)=>s+x.lat(),0)/p.length; g.lng=p.reduce((s,x)=>s+x.lng(),0)/p.length; persist(); draw(g); updateGuide(); });
       const node = el("div",{class:"lbl"}); const label=new HtmlPin({lat:g.lat,lng:g.lng}, node); label.setMap(map);
@@ -212,9 +226,10 @@ window.initMap = function(){
   store.graves.forEach(draw);
   if(store.graves.length){ const b=new google.maps.LatLngBounds(); store.graves.forEach(g=>b.extend(g)); b.extend(CENTER); map.fitBounds(b, 60); }
 
+  let preview=null; // outline of a new grave while its names are being typed
   /* ---- sheet ---- */
   function openSheet(t){ $("shTitle").textContent=t; $("shBody").innerHTML=""; $("sheet").hidden=false; }
-  function closeSheet(){ $("sheet").hidden=true; const s=selected; selected=null; const m=moving; moving=null;
+  function closeSheet(){ if(preview){ preview.setMap(null); preview=null; } $("sheet").hidden=true; const s=selected; selected=null; const m=moving; moving=null;
     for(const id of [s,m]){ const g=store.graves.find(x=>x.id===id); if(g) draw(g); } }
   $("shClose").addEventListener("click", closeSheet);
 
@@ -241,58 +256,86 @@ window.initMap = function(){
     $("shBody").append(box);
   }
 
-  /* ---- add ---- */
-  let placing=false;
-  $("btnAdd").addEventListener("click", ()=>{ closeSheet(); placing=true; $("hint").hidden=false; map.setOptions({draggableCursor:"crosshair"}); });
-  $("hintCancel").addEventListener("click", stopPlacing);
-  function stopPlacing(){ placing=false; $("hint").hidden=true; map.setOptions({draggableCursor:null}); }
-  map.addListener("click", e=>{
-    if(!placing) return; stopPlacing();
-    const last = store.graves[store.graves.length-1];
-    const g = {id:uid(), names:"", years:"", note:"", label:"", lat:e.latLng.lat(), lng:e.latLng.lng(),
-      w: last?last.w:1.8, l: last?last.l:2.4, rot: last?last.rot:0, color: last?last.color:COLORS[0]};
-    store.graves.push(g); persist(); draw(g); editGrave(g.id, true);
+  /* ---- add: 1) place the outline, 2) fill in names ---- */
+  let placeG=null, placeEditId=null, placePoly=null;
+  const DEF_W=2.2, DEF_L=2.8, MIN_S=0.4, MAX_S=10;
+  const clampS=v=>Math.min(MAX_S, Math.max(MIN_S, v));
+  const fmtM=v=>v.toFixed(1).replace(".",",");
+  function mpp(){ return 156543.03392*Math.cos(map.getCenter().lat()*Math.PI/180)/Math.pow(2,map.getZoom()); }
+  function updPlace(){ placePoly.setPaths(corners(placeG)); $("pSize").textContent=fmtM(placeG.w)+" × "+fmtM(placeG.l)+" m"; }
+  function startPlace(g, editId){
+    closeSheet();
+    placeG={lat:g.lat, lng:g.lng, w:g.w, l:g.l, rot:g.rot||0}; placeEditId=editId||null;
+    if(editId){ undraw(editId); map.panTo(g); }
+    if(map.getZoom()<20) map.setZoom(20);
+    placePoly=new google.maps.Polygon({map, paths:corners(placeG), strokeColor:"#ffffff", strokeWeight:2, fillColor:GRAVE_COLOR, fillOpacity:.6, clickable:false, zIndex:20});
+    $("place").hidden=false; $("placebar").hidden=false; $("top").hidden=true; $("fabs").hidden=true; $("guide").hidden=true;
+    updPlace();
+  }
+  function endPlace(keepOutline){
+    $("place").hidden=true; $("placebar").hidden=true; $("top").hidden=false; $("fabs").hidden=false; syncAdmin(); updateGuide();
+    if(keepOutline) preview=placePoly; else if(placePoly) placePoly.setMap(null);
+    placePoly=null;
+    if(placeEditId){ const g=store.graves.find(x=>x.id===placeEditId); if(g) draw(g); }
+    const r=placeG; placeG=null; placeEditId=null; return r;
+  }
+  $("btnAdd").addEventListener("click", ()=>{ const c=map.getCenter(); startPlace({lat:c.lat(), lng:c.lng(), w:DEF_W, l:DEF_L, rot:0}); });
+  $("pCancel").addEventListener("click", ()=>endPlace(false));
+  $("pOk").addEventListener("click", ()=>{
+    const editId=placeEditId;
+    if(editId){ const r=endPlace(false), g=store.graves.find(x=>x.id===editId); Object.assign(g,{lat:r.lat,lng:r.lng,w:r.w,l:r.l}); persist(); draw(g); openGrave(editId); return; }
+    const r=endPlace(true);
+    openForm({id:uid(), names:"", years:"", note:"", label:"", lat:r.lat, lng:r.lng, w:r.w, l:r.l, rot:r.rot, color:GRAVE_COLOR}, true);
   });
+  for(const btn of $("placebar").querySelectorAll("[data-d]")) btn.addEventListener("click", ()=>{
+    const d=btn.dataset.d, k=d[0], step=d[1]==="+"?.1:-.1; placeG[k]=clampS(Math.round((placeG[k]+step)*10)/10); updPlace(); });
 
-  /* ---- edit (names, size, rotation, colour, move) ---- */
-  function editGrave(id, isNew){
-    const g=store.graves.find(x=>x.id===id); if(!g) return;
-    selected=id; moving=id; draw(g);
-    if(map.getZoom()<20){ map.setZoom(21); map.panTo(g); }
+  /* gestures on the placement layer: 1 finger moves, 2 fingers resize (and move) */
+  const pts=new Map(); let gst=null;
+  const place=$("place");
+  function beginGesture(){ gst={lat:placeG.lat, lng:placeG.lng, w:placeG.w, l:placeG.l, m:mpp(), p:[...pts.values()].map(q=>({...q}))}; }
+  place.addEventListener("pointerdown", e=>{ if(!placeG) return; try{ place.setPointerCapture(e.pointerId); }catch(_){} pts.set(e.pointerId,{x:e.clientX,y:e.clientY}); beginGesture(); });
+  place.addEventListener("pointermove", e=>{
+    if(!placeG || !pts.has(e.pointerId)) return; pts.set(e.pointerId,{x:e.clientX,y:e.clientY});
+    const a=[...pts.values()], g0=gst; if(!g0 || a.length!==g0.p.length || !a.length) return;
+    let mx, my;
+    if(a.length===1){ mx=a[0].x-g0.p[0].x; my=a[0].y-g0.p[0].y; }
+    else {
+      const [p,q]=a, [p0,q0]=g0.p;
+      const dx0=Math.abs(p0.x-q0.x), dy0=Math.abs(p0.y-q0.y), dx=Math.abs(p.x-q.x), dy=Math.abs(p.y-q.y);
+      if(dx0>30) placeG.w=clampS(g0.w*dx/dx0);
+      if(dy0>30) placeG.l=clampS(g0.l*dy/dy0);
+      mx=(p.x+q.x-p0.x-q0.x)/2; my=(p.y+q.y-p0.y-q0.y)/2;
+    }
+    placeG.lng=g0.lng+mx*g0.m/M_LNG; placeG.lat=g0.lat-my*g0.m/M_LAT; updPlace();
+  });
+  const lift=e=>{ if(pts.delete(e.pointerId) && placeG) beginGesture(); };
+  place.addEventListener("pointerup", lift); place.addEventListener("pointercancel", lift);
+  place.addEventListener("wheel", e=>{ if(!placeG) return; e.preventDefault(); const f=Math.exp(-e.deltaY*0.002); placeG.w=clampS(placeG.w*f); placeG.l=clampS(placeG.l*f); updPlace(); }, {passive:false});
+
+  /* ---- names, years, description ---- */
+  function openForm(g, isNew){
     openSheet(isNew?"Novi grob":"Uredi grob"); const b=$("shBody");
-    const names=el("textarea",{id:"fNames",placeholder:"Ivan Horvat\nMarija Horvat r. Kovač"}); names.value=g.names;
-    const label=el("input",{type:"text",id:"fLabel",placeholder:"npr. Baka i djed (prikazuje se na karti)"}); label.value=g.label||"";
-    const years=el("input",{type:"text",id:"fYears",placeholder:"npr. 1931 – 2004"}); years.value=g.years;
-    const note=el("textarea",{id:"fNote",placeholder:"npr. crni mramor, treći red od kapelice"}); note.value=g.note;
-    const w=el("input",{type:"number",id:"fW",min:"0.5",max:"8",step:"0.1"}); w.value=g.w;
-    const l=el("input",{type:"number",id:"fL",min:"0.5",max:"8",step:"0.1"}); l.value=g.l;
-    const rot=el("input",{type:"range",id:"fRot",min:"-45",max:"45",step:"1"}); rot.value=g.rot||0;
-    const rotOut=el("span",{class:"meta"}, (g.rot||0)+"°");
-    const live=()=>{ g.w=Math.max(.3,+w.value||g.w); g.l=Math.max(.3,+l.value||g.l); g.rot=+rot.value; rotOut.textContent=g.rot+"°"; draw(g); };
-    [w,l,rot].forEach(x=>x.addEventListener("input",live));
-    const sw=el("div",{class:"row"}); COLORS.forEach(c=>{ const s=el("button",{type:"button",class:"sw"+(g.color===c?" sel":""),style:`background:${c}`,"aria-label":"Boja"});
-      s.addEventListener("click",()=>{ g.color=c; [...sw.children].forEach(x=>x.classList.remove("sel")); s.classList.add("sel"); draw(g); }); sw.append(s); });
-    const nudge=(dx,dy)=>{ g.lat+=dy/M_LAT; g.lng+=dx/M_LNG; draw(g); };
+    const names=el("textarea",{id:"fNames",placeholder:"Ivan Horvat\nMarija Horvat"}); names.value=g.names||"";
+    const years=el("input",{type:"text",id:"fYears",placeholder:"npr. 1931 – 2004"}); years.value=g.years||"";
+    const note=el("textarea",{id:"fNote",placeholder:"npr. crni mramor, kod kapelice"}); note.value=g.note||"";
+    const err=el("div",{class:"err",hidden:"hidden"},"Upišite barem jedno ime.");
+    names.addEventListener("input",()=>{ err.hidden=true; });
     b.append(
-      el("div",{class:"note"},"Oznaku možete povući prstom na točan grob, a veličinu i smjer namjestiti ispod."),
       el("label",{for:"fNames"},"Ime i prezime (svaka osoba u svoj red)",names),
-      el("label",{for:"fLabel"},"Natpis na karti (nije obavezno)",label),
-      el("label",{for:"fYears"},"Godine (nije obavezno)",years),
-      el("label",{for:"fNote"},"Bilješka (nije obavezno)",note),
-      el("div",{class:"row"}, el("label",{for:"fW",style:"flex:1"},"Širina (m)",w), el("label",{for:"fL",style:"flex:1"},"Dužina (m)",l)),
-      el("label",{for:"fRot"}, el("span",{},"Zakret ", rotOut), rot),
-      el("div",{class:"row"}, el("span",{class:"meta"},"Pomak 20 cm:"),
-        el("button",{class:"btn sm",type:"button",onclick:()=>nudge(0,.2)},"↑"), el("button",{class:"btn sm",type:"button",onclick:()=>nudge(0,-.2)},"↓"),
-        el("button",{class:"btn sm",type:"button",onclick:()=>nudge(-.2,0)},"←"), el("button",{class:"btn sm",type:"button",onclick:()=>nudge(.2,0)},"→")),
-      el("div",{},el("div",{class:"meta",style:"margin-bottom:6px"},"Boja"),sw),
+      el("label",{for:"fYears"},"Godine",years),
+      el("label",{for:"fNote"},"Kratak opis",note), err,
       el("div",{class:"row"},
         el("button",{class:"btn pri",type:"button",onclick:()=>{
-          g.names=names.value.trim(); g.label=label.value.trim(); g.years=years.value.trim(); g.note=note.value.trim(); live();
-          persist(); moving=null; openGrave(id); }},"Spremi"),
-        el("button",{class:"btn",type:"button",onclick:()=>{ if(isNew && !g.names){ store.graves=store.graves.filter(x=>x.id!==id); undraw(id); persist(); closeSheet(); } else { persist(); moving=null; openGrave(id); } }}, isNew?"Odustani":"Gotovo"))
-    );
+          if(!names.value.trim()){ err.hidden=false; names.focus(); return; }
+          Object.assign(g,{names:names.value.trim(), years:years.value.trim(), note:note.value.trim()});
+          if(isNew){ if(preview){ preview.setMap(null); preview=null; } store.graves.push(g); }
+          persist(); draw(g); openGrave(g.id); }},"Spremi"),
+        isNew ? null : el("button",{class:"btn",type:"button",onclick:()=>startPlace(g, g.id)},"Premakni / veličina"),
+        el("button",{class:"btn",type:"button",onclick:()=>{ if(isNew) closeSheet(); else openGrave(g.id); }},"Odustani")));
     setTimeout(()=>names.focus(),50);
   }
+  function editGrave(id){ const g=store.graves.find(x=>x.id===id); if(g) openForm(g,false); }
 
   /* ---- list, export, import, save copy ---- */
   $("btnList").addEventListener("click", ()=>{
