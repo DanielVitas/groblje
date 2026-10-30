@@ -182,7 +182,7 @@ window.initMap = function(){
   class HtmlPin extends google.maps.OverlayView{
     constructor(pos, node){ super(); this.pos=pos; this.node=node; }
     onAdd(){ this.getPanes().floatPane.appendChild(this.node); }
-    draw(){ const p=this.getProjection().fromLatLngToDivPixel(new google.maps.LatLng(this.pos)); if(p){ this.node.style.left=p.x+"px"; this.node.style.top=p.y+"px"; } }
+    draw(){ const pr=this.getProjection(); if(!pr) return; const p=pr.fromLatLngToDivPixel(new google.maps.LatLng(this.pos)); if(p){ this.node.style.left=p.x+"px"; this.node.style.top=p.y+"px"; } }
     onRemove(){ this.node.remove(); }
     setPos(pos){ this.pos=pos; this.draw(); }
   }
