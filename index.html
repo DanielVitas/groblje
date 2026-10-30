@@ -119,7 +119,9 @@ input[type=range]{width:100%}
 /* ---- Data that travels with this file. "Spremi kopiju" rewrites the block between the markers. ---- */
 const SAVED = /*DATA-START*/{"key":"AIzaSyCjBcEOTSjJ3ZmZj2GcOE11qiL_uhPO8lg","graves":[]}/*DATA-END*/;
 /* Petrijevci cemetery, OpenStreetMap way 177134136 (centre). */
-const CENTER = {lat:45.61895, lng:18.53685};
+const CENTER = {lat:45.61895, lng:18.53700};
+/* Area the map may show: the cemetery plus ~30 m around it. */
+const BOUNDS = {south:45.61780, west:18.53450, north:45.62010, east:18.53950};
 </script>
 <script>
 "use strict";
@@ -168,7 +170,7 @@ function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(
 /* ---- the app (runs when Google Maps is ready) ---- */
 window.initMap = function(){
   $("top").hidden=false; $("fabs").hidden=false; persist();
-  const map = new google.maps.Map($("map"), {center:CENTER, zoom:20, mapTypeId:"satellite", tilt:0, heading:0, rotateControl:false,
+  const map = new google.maps.Map($("map"), {center:CENTER, zoom:19, minZoom:17, restriction:{latLngBounds:BOUNDS, strictBounds:false}, mapTypeId:"satellite", tilt:0, heading:0, rotateControl:false,
     streetViewControl:false, fullscreenControl:false, mapTypeControl:true, mapTypeControlOptions:{position:google.maps.ControlPosition.LEFT_BOTTOM, mapTypeIds:["satellite","hybrid","roadmap"]},
     zoomControl:true, zoomControlOptions:{position:google.maps.ControlPosition.LEFT_CENTER}, clickableIcons:false, gestureHandling:"greedy", maxZoom:22});
 
@@ -355,7 +357,7 @@ window.initMap = function(){
       if(!meDot){ meCircle=new google.maps.Circle({map,center:me,radius:me.acc,strokeColor:"#1a73e8",strokeWeight:1,fillColor:"#1a73e8",fillOpacity:.15,clickable:false});
         meDot=new HtmlPin(me, el("div",{class:"me-ico"})); meDot.setMap(map); }
       else { meDot.setPos(me); meCircle.setCenter(me); meCircle.setRadius(me.acc); }
-      const far = dist(me,CENTER).d > 300;
+      const far = !(me.lat>BOUNDS.south && me.lat<BOUNDS.north && me.lng>BOUNDS.west && me.lng<BOUNDS.east);
       showGps(`GPS točnost ±<b>${Math.round(me.acc)} m</b>`+(far?" · niste na groblju":""));
       if(follow){ map.panTo(me); if(first && map.getZoom()<20) map.setZoom(20); }
       updateGuide();
