@@ -120,7 +120,7 @@ input[type=range]{width:100%}
 
 <script>
 /* ---- Data that travels with this file. "Spremi kopiju" rewrites the block between the markers. ---- */
-const SAVED = /*DATA-START*/{"key":"AIzaSyCjBcEOTSjJ3ZmZj2GcOE11qiL_uhPO8lg","graves":[]}/*DATA-END*/;
+const SAVED = /*DATA-START*/{"key": "AIzaSyCjBcEOTSjJ3ZmZj2GcOE11qiL_uhPO8lg", "graves": [{"id": "primjer1", "names": "Primjer 1", "years": "1921 – 1987", "note": "Primjer groba – obrišite ga kad dodate prave.", "label": "", "lat": 45.618816, "lng": 18.53688, "w": 2.2, "l": 2.8, "rot": 0, "color": "#f0a040"}, {"id": "primjer2", "names": "Primjer 2\nPrimjer 3", "years": "1930 – 2004", "note": "Primjer groba s dvije osobe.", "label": "", "lat": 45.61917, "lng": 18.536815, "w": 2.2, "l": 2.8, "rot": 0, "color": "#4fa3f7"}, {"id": "primjer3", "names": "Primjer 4", "years": "1948 – 2015", "note": "Primjer groba – obrišite ga kad dodate prave.", "label": "", "lat": 45.61891, "lng": 18.536463, "w": 2.2, "l": 2.8, "rot": 0, "color": "#e8505b"}]}/*DATA-END*/;
 /* Petrijevci cemetery, OpenStreetMap way 177134136 (centre). */
 const CENTER = {lat:45.61895, lng:18.53700};
 /* Area the map may show: the cemetery plus ~30 m around it. */
@@ -135,7 +135,8 @@ const COLORS = ["#f0a040","#e8505b","#4fa3f7","#5cc46a","#b07cf0"];
 let store = {key:"", graves:[]};
 try{ const s = JSON.parse(localStorage.getItem(LS)||"null"); if(s) store = s; }catch(e){}
 // graves baked into the file are added if this browser does not have them yet
-for(const g of (SAVED.graves||[])) if(!store.graves.some(x=>x.id===g.id)) store.graves.push(g);
+store.deleted = store.deleted || [];
+for(const g of (SAVED.graves||[])) if(!store.graves.some(x=>x.id===g.id) && !store.deleted.includes(g.id)) store.graves.push(g);
 if(!store.key && SAVED.key) store.key = SAVED.key;
 function persist(){ try{ localStorage.setItem(LS, JSON.stringify(store)); }catch(e){} const n=$("nGraves"); if(n) n.textContent=store.graves.length; }
 
@@ -233,7 +234,7 @@ window.initMap = function(){
   function askDelete(id){
     const g=store.graves.find(x=>x.id===id);
     const box=el("div",{class:"confirm"}, el("div",{},`Obrisati „${firstLine(g)}“?`), el("div",{class:"row"},
-      el("button",{class:"btn danger",type:"button",onclick:()=>{ store.graves=store.graves.filter(x=>x.id!==id); undraw(id); if(target===id){target=null;updateGuide();} persist(); closeSheet(); }},"Da, obriši"),
+      el("button",{class:"btn danger",type:"button",onclick:()=>{ store.graves=store.graves.filter(x=>x.id!==id); store.deleted.push(id); undraw(id); if(target===id){target=null;updateGuide();} persist(); closeSheet(); }},"Da, obriši"),
       el("button",{class:"btn",type:"button",onclick:()=>box.remove()},"Ne")));
     $("shBody").append(box);
   }
