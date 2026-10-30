@@ -174,6 +174,8 @@ function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(
 /* ---- the app (runs when Google Maps is ready) ---- */
 window.initMap = function(){
   $("top").hidden=false; $("fabs").hidden=false; persist();
+  const syncAdmin=()=>{ $("btnAdd").hidden = location.hash!=="#admin"; };
+  syncAdmin(); addEventListener("hashchange", syncAdmin);
   const map = new google.maps.Map($("map"), {center:CENTER, zoom:19.5, minZoom:19.5, isFractionalZoomEnabled:true, restriction:{latLngBounds:BOUNDS, strictBounds:false}, mapTypeId:"satellite", tilt:0, heading:0, rotateControl:false,
     streetViewControl:false, fullscreenControl:false, mapTypeControl:false,
     zoomControl:true, zoomControlOptions:{position:google.maps.ControlPosition.LEFT_CENTER}, clickableIcons:false, gestureHandling:"greedy", maxZoom:20});
@@ -301,13 +303,8 @@ window.initMap = function(){
     for(const g of items) b.append(el("button",{class:"grave",type:"button",onclick:()=>openGrave(g.id,true)},
       el("b",{}, g.names||"Bez imena"), g.years ? el("span",{}, g.years) : null));
     if(location.hash==="#admin"){
-      const withKey=el("input",{type:"checkbox",id:"fWithKey",checked:"checked"});
       b.append(
-        el("label",{for:"fWithKey",style:"flex-direction:row;align-items:center;gap:8px;color:var(--fg)"}, withKey, "Upiši i API ključ u kopiju"),
-        el("div",{class:"row"},
-          el("button",{class:"btn pri",type:"button",onclick:()=>saveCopy(withKey.checked)},"Spremi kopiju s oznakama"),
-          el("button",{class:"btn",type:"button",onclick:exportJson},"Izvezi oznake"),
-          el("button",{class:"btn",type:"button",onclick:()=>$("importFile").click()},"Uvezi oznake")),
+        el("div",{class:"row"}, el("button",{class:"btn pri",type:"button",onclick:()=>saveCopy(true)},"Izvezi")),
         el("div",{class:"note",id:"msg"}));
     }
   });
@@ -317,7 +314,7 @@ window.initMap = function(){
     if(!PAGE_SOURCE){ msg("Kopiju nije moguće napraviti u ovom pregledniku."); return; }
     const data={key: withKey?store.key:"", graves:store.graves};
     const out=PAGE_SOURCE.replace(/\/\*DATA-START\*\/[\s\S]*?\/\*DATA-END\*\//, ()=>"/*DATA-START*/"+JSON.stringify(data).replace(/</g,"\\u003c")+"/*DATA-END*/");
-    download("groblje-petrijevci-oznake.html", out, "text/html"); msg("Spremljeno: groblje-petrijevci-oznake.html");
+    download("groblje-export.html", out, "text/html"); msg("Spremljeno u Prenosi: groblje-export.html");
   }
   function exportJson(){ download("groblje-petrijevci-oznake.json", JSON.stringify(store.graves,null,1), "application/json"); msg("Izvezeno."); }
   $("importFile").addEventListener("change", async e=>{
