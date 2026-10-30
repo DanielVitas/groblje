@@ -19,7 +19,12 @@ button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-vis
 .search{flex:1;min-width:0;position:relative}
 .search input{width:100%;font:inherit;color:var(--fg);background:var(--panel);border:0;border-radius:10px;padding:11px 12px;box-shadow:var(--shadow)}
 .chip{background:var(--panel);border:0;border-radius:10px;padding:10px 12px;box-shadow:var(--shadow);white-space:nowrap}
-.chip b{color:var(--accent)}
+.top{justify-content:flex-end;pointer-events:none}
+.menu{pointer-events:auto;width:48px;height:48px;border:0;border-radius:10px;background:var(--panel);box-shadow:var(--shadow);display:grid;place-items:center}
+.menu svg{width:26px;height:26px}
+.grave{display:block;width:100%;text-align:left;border:0;border-bottom:1px solid var(--line);background:transparent;padding:10px 2px}
+.grave b{display:block;font-weight:600;white-space:pre-line}
+.grave span{color:var(--muted);font-size:13px}
 .results{position:absolute;left:0;right:0;top:calc(100% + 6px);background:var(--panel);border-radius:10px;box-shadow:var(--shadow);max-height:55vh;overflow:auto}
 .res{display:block;width:100%;text-align:left;border:0;background:transparent;padding:9px 12px;border-bottom:1px solid var(--line)}
 .res span{color:var(--muted);font-size:13px}
@@ -75,11 +80,7 @@ input[type=range]{width:100%}
 <div id="map"></div>
 
 <div class="top" id="top" hidden>
-  <div class="search">
-    <input type="search" id="q" placeholder="Traži ime…" autocomplete="off" aria-label="Traži">
-    <div class="results" id="results" hidden></div>
-  </div>
-  <button class="chip" id="btnList" type="button">Grobovi <b id="nGraves">0</b></button>
+  <button class="menu" id="btnList" type="button" aria-label="Popis grobova"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
 </div>
 <div class="gps" id="gps" hidden></div>
 <div class="banner" id="guide" hidden>
@@ -171,7 +172,7 @@ function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(
 window.initMap = function(){
   $("top").hidden=false; $("fabs").hidden=false; persist();
   const map = new google.maps.Map($("map"), {center:CENTER, zoom:19, minZoom:18, restriction:{latLngBounds:BOUNDS, strictBounds:false}, mapTypeId:"satellite", tilt:0, heading:0, rotateControl:false,
-    streetViewControl:false, fullscreenControl:false, mapTypeControl:true, mapTypeControlOptions:{position:google.maps.ControlPosition.LEFT_BOTTOM, mapTypeIds:["satellite","hybrid","roadmap"]},
+    streetViewControl:false, fullscreenControl:false, mapTypeControl:false,
     zoomControl:true, zoomControlOptions:{position:google.maps.ControlPosition.LEFT_CENTER}, clickableIcons:false, gestureHandling:"greedy", maxZoom:22});
 
   /* HTML overlay for labels and the GPS dot */
@@ -288,41 +289,23 @@ window.initMap = function(){
     setTimeout(()=>names.focus(),50);
   }
 
-  /* ---- search ---- */
-  const norm=s=>(s||"").toLocaleLowerCase("hr").normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/đ/g,"d");
-  const q=$("q"), res=$("results");
-  q.addEventListener("input", renderResults); q.addEventListener("focus", renderResults);
-  document.addEventListener("click", e=>{ if(!e.target.closest(".search")) res.hidden=true; });
-  function renderResults(){
-    const words=norm(q.value.trim()).split(/\s+/).filter(Boolean); res.innerHTML="";
-    if(!words.length){ res.hidden=true; return; }
-    const hits=store.graves.filter(g=>{ const t=norm([g.names,g.label,g.years,g.note].join(" ")); return words.every(w=>t.includes(w)); });
-    if(!hits.length) res.append(el("div",{class:"res"},"Nema rezultata."));
-    for(const g of hits) res.append(el("button",{class:"res",type:"button",onclick:()=>{ res.hidden=true; q.blur(); openGrave(g.id,true); }},
-      el("b",{}, g.label||firstLine(g)), el("br"), el("span",{}, g.names.replace(/\n/g,", ")+(g.years?" · "+g.years:""))));
-    res.hidden=false;
-  }
-
   /* ---- list, export, import, save copy ---- */
   $("btnList").addEventListener("click", ()=>{
-    openSheet("Označeni grobovi"); const b=$("shBody");
-    let items=store.graves.map(g=>({g, d: me?dist(me,g).d:null}));
-    items.sort((a,b)=> a.d!=null ? a.d-b.d : (a.g.label||firstLine(a.g)).localeCompare(b.g.label||firstLine(b.g),"hr"));
-    if(!items.length) b.append(el("div",{class:"note"},"Još nema označenih grobova. Dodirnite + pa dodirnite grob na slici."));
-    for(const {g,d} of items) b.append(el("button",{class:"item",type:"button",onclick:()=>openGrave(g.id,true)},
-      el("span",{class:"dot",style:`background:${g.color}`}), el("div",{class:"n"}, el("b",{},g.label||firstLine(g)), el("span",{}, g.names.replace(/\n/g,", "))),
-      el("div",{class:"d"}, d==null?"":fmtD(d))));
-    const withKey=el("input",{type:"checkbox",id:"fWithKey",checked:"checked"});
-    b.append(
-      el("div",{class:"note"},"Oznake se spremaju u ovom pregledniku. Za mamu ili drugi uređaj napravite kopiju datoteke u kojoj su oznake već upisane."),
-      el("label",{for:"fWithKey",style:"flex-direction:row;align-items:center;gap:8px;color:var(--fg)"}, withKey, "Upiši i API ključ u kopiju"),
-      el("div",{class:"row"},
-        el("button",{class:"btn pri",type:"button",onclick:()=>saveCopy(withKey.checked)},"Spremi kopiju s oznakama"),
-        el("button",{class:"btn",type:"button",onclick:exportJson},"Izvezi oznake"),
-        el("button",{class:"btn",type:"button",onclick:()=>$("importFile").click()},"Uvezi oznake")),
-      el("div",{class:"note",id:"msg"}),
-      el("div",{class:"row"}, el("button",{class:"btn sm",type:"button",onclick:()=>{ store.key=""; persist(); location.reload(); }},"Promijeni API ključ")),
-      el("div",{class:"note"},"Satelitska snimka: Google. Granice grobova crtate sami; nisu službeni podaci."));
+    openSheet("Grobovi"); const b=$("shBody");
+    const items=[...store.graves].sort((x,y)=>(x.names||"").localeCompare(y.names||"","hr"));
+    if(!items.length) b.append(el("div",{class:"note"},"Još nema označenih grobova."));
+    for(const g of items) b.append(el("button",{class:"grave",type:"button",onclick:()=>openGrave(g.id,true)},
+      el("b",{}, g.names||"Bez imena"), g.years ? el("span",{}, g.years) : null));
+    if(location.hash==="#admin"){
+      const withKey=el("input",{type:"checkbox",id:"fWithKey",checked:"checked"});
+      b.append(
+        el("label",{for:"fWithKey",style:"flex-direction:row;align-items:center;gap:8px;color:var(--fg)"}, withKey, "Upiši i API ključ u kopiju"),
+        el("div",{class:"row"},
+          el("button",{class:"btn pri",type:"button",onclick:()=>saveCopy(withKey.checked)},"Spremi kopiju s oznakama"),
+          el("button",{class:"btn",type:"button",onclick:exportJson},"Izvezi oznake"),
+          el("button",{class:"btn",type:"button",onclick:()=>$("importFile").click()},"Uvezi oznake")),
+        el("div",{class:"note",id:"msg"}));
+    }
   });
   function msg(t){ const m=$("msg"); if(m) m.textContent=t; }
   function download(name,text,type){ const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob([text],{type})); a.download=name; document.body.append(a); a.click(); setTimeout(()=>{URL.revokeObjectURL(a.href); a.remove();},1500); }
