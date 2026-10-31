@@ -401,9 +401,20 @@ window.initMap = function(){
       g.photo ? el("button",{class:"co-ph",type:"button","aria-label":"Povećaj sliku",onclick:()=>lightbox(g)}, el("img",{src:g.photo,alt:"Grob: "+title(g),style:focusPos(g)}), el("span",{class:"zoomhint"},"⤢ povećaj")) : null,
       body,
       el("button",{class:"co-x",type:"button","aria-label":"Zatvori",onclick:deselect},"✕"));
-    callout.pos=topOf(g); callout.after=fitCallout;
+    callout.pos=topOf(g); callout.after= pan ? centerForCallout : fitCallout;
     if(!callout.getMap()) callout.setMap(map); else callout.draw();
     redraw(prev, id);
+  }
+  function centerForCallout(){
+    const n=callout.node, body=n.querySelector(".co-b");
+    if(!callout.getMap() || !body) return;
+    n.classList.remove("below"); n.style.marginLeft="0px"; n.style.removeProperty("--ph"); n.style.setProperty("--ax","50%"); body.style.maxHeight="";
+    const m=$("map").getBoundingClientRect(), r=n.getBoundingClientRect();
+    const anchor=r.bottom+12-m.top;                       // grave top edge, px from map top
+    const want=Math.min(m.height-70, 70+r.height+24);     // pop-up just under the top bar, grave right below it
+    const dy=anchor-want;
+    if(Math.abs(dy)>2){ map.panBy(0, dy); setTimeout(()=>{ if(callout.getMap()) fitCallout(); }, 450); }
+    else fitCallout();
   }
   map.addListener("idle", ()=>{ if(callout.getMap()) fitCallout(); });
   function deselect(){ const s=selected; selected=null; callout.setMap(null); redraw(s); }
