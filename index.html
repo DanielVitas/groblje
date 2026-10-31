@@ -42,25 +42,29 @@ img{display:block}
 .pin.dim{visibility:hidden}
 
 /* callout that pops up next to the selected grave */
-.callout{--ph:min(260px,34vh);--ax:50%;position:absolute;z-index:5;width:min(300px,calc(100vw - 24px));transform:translate(-50%,calc(-100% - 12px));background:var(--panel);color:var(--fg);border-radius:14px;box-shadow:0 6px 24px rgba(0,0,0,.45);font:14px/1.35 var(--font);cursor:default}
+.callout{--ph:min(150px,22vh);--ax:50%;position:absolute;z-index:5;width:min(260px,calc(100vw - 24px));transform:translate(-50%,calc(-100% - 12px));transform-origin:var(--ax) 100%;background:var(--panel);color:var(--fg);border-radius:12px;box-shadow:0 4px 18px rgba(0,0,0,.4);font:13px/1.35 var(--font);cursor:default}
+.callout.pending{visibility:hidden}
+.callout.pop{animation:coPop .16s ease-out}
+@keyframes coPop{from{opacity:0;scale:.94}to{opacity:1;scale:1}}
 .callout::after{content:"";position:absolute;left:var(--ax);bottom:-8px;margin-left:-9px;border:9px solid transparent;border-bottom:0;border-top-color:var(--panel)}
-.callout.below{transform:translate(-50%,12px)}
+.callout.below{transform:translate(-50%,12px);transform-origin:var(--ax) 0}
 .callout.below::after{bottom:auto;top:-8px;border-top:0;border-bottom:9px solid var(--panel)}
 .co-b{overflow-y:auto}
-.co-ph{display:block;width:100%;height:var(--ph);padding:0;border:0;border-radius:14px 14px 0 0;overflow:hidden;background:#333;position:relative}
+.co-ph{display:block;width:100%;height:var(--ph);padding:0;border:0;border-radius:12px 12px 0 0;overflow:hidden;background:#333;position:relative}
 .co-ph img{width:100%;height:100%;object-fit:cover}
-.zoomhint{position:absolute;right:8px;bottom:8px;background:rgba(0,0,0,.55);color:#fff;border-radius:6px;font-size:12px;padding:2px 7px}
-.co-b{padding:10px 12px 12px;display:flex;flex-direction:column;gap:3px}
-.co-t{font:600 16px/1.25 var(--serif);padding-right:22px}
-.co-p{display:flex;justify-content:space-between;gap:8px;font-size:13px}
+.zoomhint{position:absolute;right:6px;bottom:6px;background:rgba(0,0,0,.55);color:#fff;border-radius:6px;font-size:11px;padding:1px 6px}
+.co-b{padding:8px 11px 10px;display:flex;flex-direction:column;gap:2px}
+.co-t{font:600 15px/1.25 var(--serif)}
+.callout.nophoto .co-t{padding-right:26px}
+.co-p{display:flex;justify-content:space-between;gap:8px;font-size:12.5px}
 .co-p span:first-child{flex:none;max-width:60%}
 .co-p .dd,.co-more{color:var(--muted);font-variant-numeric:tabular-nums;text-align:right}
 .co-more{font-size:12px}
-.co-b .row{margin-top:7px}
-.co-insc{margin:6px 0 0;padding:2px 0 2px 10px;border-left:3px solid var(--accent);font:italic 14px/1.4 var(--serif)}
-.co-insc div+div{margin-top:2px}
-.co-x{position:absolute;right:6px;top:calc(var(--ph) + 6px);border:0;background:transparent;color:var(--muted);font-size:18px;padding:2px 6px}
-.callout.nophoto .co-x{top:6px}
+.co-b .row{margin-top:6px}
+.co-insc{margin:4px 0 0;padding:1px 0 1px 8px;border-left:3px solid var(--accent);font:italic 13px/1.35 var(--serif)}
+.co-insc div+div{margin-top:1px}
+.co-x{position:absolute;right:7px;top:7px;width:28px;height:28px;display:grid;place-items:center;border:0;border-radius:50%;background:rgba(255,255,255,.92);color:#222;font-size:14px;line-height:1;padding:0;box-shadow:0 1px 4px rgba(0,0,0,.35)}
+.callout.nophoto .co-x{background:transparent;box-shadow:none;color:var(--muted);font-size:17px}
 
 .sheet{position:absolute;z-index:12;left:0;right:0;bottom:0;background:var(--panel);border-radius:16px 16px 0 0;box-shadow:0 -4px 20px rgba(0,0,0,.25);max-height:82%;display:flex;flex-direction:column;padding-bottom:env(safe-area-inset-bottom,0px)}
 @media (min-width:760px){.sheet{left:auto;right:12px;bottom:12px;width:410px;border-radius:14px;max-height:calc(100% - 90px)}}
@@ -387,7 +391,6 @@ window.initMap = function(){
     const g=store.graves.find(x=>x.id===id); if(!g) return;
     $("sheet").hidden=true;
     const prev=selected; selected=id;
-    if(pan){ map.setCenter(g); if(map.getZoom()<20.5) map.setZoom(20.5); }
     const ps=people(g), n=callout.node;
     n.classList.toggle("nophoto", !g.photo);
     const body=el("div",{class:"co-b"}, el("b",{class:"co-t"}, title(g)));
@@ -401,23 +404,37 @@ window.initMap = function(){
       g.photo ? el("button",{class:"co-ph",type:"button","aria-label":"Povećaj sliku",onclick:()=>lightbox(g)}, el("img",{src:g.photo,alt:"Grob: "+title(g),style:focusPos(g)}), el("span",{class:"zoomhint"},"⤢ povećaj")) : null,
       body,
       el("button",{class:"co-x",type:"button","aria-label":"Zatvori",onclick:deselect},"✕"));
-    callout.pos=topOf(g); callout.after= pan ? centerForCallout : fitCallout;
+    callout.pos=topOf(g); n.classList.remove("pop","below"); n.classList.add("pending");
+    callout.after=()=>openCallout(g, pan);
     if(!callout.getMap()) callout.setMap(map); else callout.draw();
     redraw(prev, id);
   }
-  function centerForCallout(){
-    const n=callout.node, body=n.querySelector(".co-b");
+  /* Opening behaves like a Google Maps InfoWindow: the card sits above the grave and the map moves so it is fully visible.
+     From the list the grave goes to the middle of the screen (a bit lower only if the card would not fit above it). */
+  let openTok=0;
+  function openCallout(g, fromList){
+    const n=callout.node, body=n.querySelector(".co-b"), tok=++openTok;
     if(!callout.getMap() || !body) return;
-    n.classList.remove("below"); n.style.marginLeft="0px"; n.style.removeProperty("--ph"); n.style.setProperty("--ax","50%"); body.style.maxHeight="";
-    const m=$("map").getBoundingClientRect(), r=n.getBoundingClientRect();
-    const anchor=r.bottom+12-m.top;                       // grave top edge, px from map top
-    const want=Math.min(m.height-70, 70+r.height+24);     // pop-up just under the top bar, grave right below it
-    const dy=anchor-want;
-    if(Math.abs(dy)>2){ map.panBy(0, dy); setTimeout(()=>{ if(callout.getMap()) fitCallout(); }, 450); }
-    else fitCallout();
+    n.style.marginLeft="0px"; n.style.removeProperty("--ph"); n.style.setProperty("--ax","50%"); body.style.maxHeight="";
+    const m=$("map").getBoundingClientRect(), h=n.offsetHeight, TOP=70, PAD=12;
+    const show=()=>{ if(tok!==openTok) return; fitCallout(); n.classList.remove("pending"); void n.offsetWidth; n.classList.add("pop"); };
+    const settle=()=>{ let done=false; const go=()=>{ if(!done){ done=true; show(); } }; const l=map.addListener("idle", ()=>{ l.remove(); go(); }); setTimeout(go, 600); };
+    if(fromList){
+      const z=Math.max(map.getZoom(), 20.5), mpp=156543.03392*Math.cos(g.lat*Math.PI/180)/Math.pow(2,z);
+      const half=(topOf(g).lat-g.lat)*M_LAT/mpp;                          // half the grave's height in px
+      let y=Math.max(m.height/2, TOP+h+12+half+6);                        // grave centre, px from the map's top
+      y=Math.min(y, m.height-half-PAD);
+      map.moveCamera({center:{lat:g.lat+(y-m.height/2)*mpp/M_LAT, lng:g.lng}, zoom:z});
+      settle(); return;
+    }
+    const r=n.getBoundingClientRect(), anchor=r.bottom+12, gh=(()=>{ const pr=projOv.getProjection(); if(!pr) return 0;
+      const a=pr.fromLatLngToDivPixel(new google.maps.LatLng(topOf(g))), b=pr.fromLatLngToDivPixel(new google.maps.LatLng(g)); return 2*(b.y-a.y); })();
+    let dx=0, dy=0;
+    if(r.left<m.left+PAD) dx=r.left-(m.left+PAD); else if(r.right>m.right-PAD) dx=r.right-(m.right-PAD);
+    if(r.top<m.top+TOP) dy=r.top-(m.top+TOP); else if(anchor+gh>m.bottom-PAD) dy=Math.min(anchor+gh-(m.bottom-PAD), r.top-(m.top+TOP));
+    if(Math.abs(dx)>1 || Math.abs(dy)>1){ map.panBy(dx, dy); settle(); } else show();
   }
-  map.addListener("idle", ()=>{ if(callout.getMap()) fitCallout(); });
-  function deselect(){ const s=selected; selected=null; callout.setMap(null); redraw(s); }
+  function deselect(){ const s=selected; selected=null; openTok++; callout.setMap(null); redraw(s); }
   map.addListener("click", ()=>{ if(!placeG) deselect(); });
 
   store.graves.forEach(draw);
