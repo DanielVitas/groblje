@@ -33,10 +33,10 @@ img{display:block}
 .banner .gth img{width:56px;height:56px;border-radius:8px;object-fit:cover}
 
 /* map pins: photo + name, next to each grave */
-.pin{position:absolute;transform:translate(-50%,-100%);margin-top:-5px;display:flex;align-items:center;gap:5px;max-width:230px;border:0;background:rgba(255,255,255,.96);color:#1d1f1a;font:600 12px/1.15 var(--font);padding:2px 8px 2px 2px;border-radius:999px;box-shadow:0 1px 4px rgba(0,0,0,.5);white-space:nowrap}
-.pin img{width:40px;height:40px;border-radius:50%;object-fit:cover;flex:none}
-.pin span{overflow:hidden;text-overflow:ellipsis}
-.pin.noimg{padding-left:8px}
+.pin{position:absolute;transform:translate(-50%,-100%);margin-top:-5px;display:flex;flex-direction:column;align-items:center;gap:3px;width:84px;border:0;background:rgba(255,255,255,.96);color:#1d1f1a;font:600 12px/1.15 var(--font);padding:3px 3px 4px;border-radius:10px;box-shadow:0 1px 4px rgba(0,0,0,.5);white-space:nowrap}
+.pin img{width:72px;height:72px;border-radius:7px;object-fit:cover;flex:none}
+.pin span{width:100%;white-space:normal;text-align:center;overflow:hidden;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2;padding:0 2px}
+.pin.noimg{padding:5px 6px}
 .pin.sel{background:var(--accent);color:#fff}
 .pin.dim{visibility:hidden}
 
@@ -53,6 +53,8 @@ img{display:block}
 .co-p .dd,.co-more{color:var(--muted);font-variant-numeric:tabular-nums;text-align:right}
 .co-more{font-size:12px}
 .co-b .row{margin-top:7px}
+.co-insc{margin:6px 0 0;padding:2px 0 2px 10px;border-left:3px solid var(--accent);font:italic 14px/1.4 var(--serif)}
+.co-insc div+div{margin-top:2px}
 .co-x{position:absolute;right:6px;top:calc(min(260px,34vh) + 6px);border:0;background:transparent;color:var(--muted);font-size:18px;padding:2px 6px}
 .callout.nophoto .co-x{top:6px}
 
@@ -346,11 +348,11 @@ window.initMap = function(){
     n.classList.toggle("nophoto", !g.photo);
     const body=el("div",{class:"co-b"}, el("b",{class:"co-t"}, title(g)));
     if(ps.length===1 && ps[0].n===title(g)){ if(ps[0].d) body.append(el("div",{class:"co-p"}, el("span",{class:"dd"},ps[0].d))); }
-    else for(const p of ps.slice(0,3)) body.append(el("div",{class:"co-p"}, el("span",{},p.n), p.d ? el("span",{class:"dd"},p.d) : null));
-    if(ps.length>3) body.append(el("div",{class:"co-more"}, `+ još ${ps.length-3}`));
+    else for(const p of ps) body.append(el("div",{class:"co-p"}, el("span",{},p.n), p.d ? el("span",{class:"dd"},p.d) : null));
+    if(g.inscription){ const q=el("div",{class:"co-insc"}); for(const t of lines(g.inscription)) q.append(el("div",{},t)); body.append(q); }
     body.append(el("div",{class:"row"},
       el("button",{class:"btn me sm",type:"button",onclick:()=>navigateTo(id)},"Vodi me"),
-      el("button",{class:"btn sm",type:"button",onclick:()=>openDetails(id)},"Detalji")));
+      isAdmin() ? el("button",{class:"btn sm",type:"button",onclick:()=>{ callout.setMap(null); openForm(g,false); }},"Uredi") : null));
     n.replaceChildren(
       g.photo ? el("button",{class:"co-ph",type:"button","aria-label":"Povećaj sliku",onclick:()=>lightbox(g)}, el("img",{src:g.photo,alt:"Grob: "+title(g),style:focusPos(g)}), el("span",{class:"zoomhint"},"⤢ povećaj")) : null,
       body,
@@ -371,22 +373,6 @@ window.initMap = function(){
   function closeSheet(){ if(preview){ preview.setMap(null); preview=null; } $("sheet").hidden=true; if(selected) deselect(); }
   $("shClose").addEventListener("click", closeSheet);
 
-  function openDetails(id){
-    const g=store.graves.find(x=>x.id===id); if(!g) return;
-    callout.setMap(null); const prev=selected; selected=id; redraw(prev,id);
-    openSheet(title(g)); const b=$("shBody");
-    if(g.photo) b.append(el("button",{class:"hero",type:"button","aria-label":"Povećaj sliku",onclick:()=>lightbox(g)}, el("img",{src:g.photo,alt:"Grob: "+title(g),style:focusPos(g)}), el("span",{class:"zoomhint"},"⤢ povećaj")));
-    const ps=people(g);
-    if(ps.length){ const l=el("div",{class:"ppl"}); for(const p of ps) l.append(el("div",{class:"per"}, el("b",{},p.n), p.d ? el("span",{},p.d) : null)); b.append(el("div",{class:"sec"}, el("h3",{}, ps.length>1?"Ovdje počivaju":"Ovdje počiva"), l)); }
-    if(g.inscription){ const q=el("blockquote",{class:"insc"}); for(const t of lines(g.inscription)) q.append(el("div",{},t)); b.append(el("div",{class:"sec"}, el("h3",{},"Natpis"), q)); }
-    if(g.note){ const f=el("div",{class:"find"}); f.innerHTML=ICON_FIND; f.append(el("div",{}, g.note)); b.append(el("div",{class:"sec"}, el("h3",{},"Kako ga prepoznati"), f)); }
-    if(me){ const r=dist(me,g); b.append(el("div",{class:"dist"}, `Od vas: ${fmtD(r.d)}, ${DIRS[Math.round(r.brg/45)%8]}`)); }
-    b.append(el("div",{class:"row"},
-      el("button",{class:"btn me",type:"button",onclick:()=>navigateTo(id)},"Vodi me"),
-      el("button",{class:"btn",type:"button",onclick:()=>{ $("sheet").hidden=true; selectGrave(id,true); }},"Pokaži na karti"),
-      isAdmin() ? el("button",{class:"btn",type:"button",onclick:()=>openForm(g,false)},"Uredi") : null,
-      isAdmin() ? el("button",{class:"btn danger",type:"button",onclick:()=>askDelete(id)},"Obriši") : null));
-  }
   function askDelete(id){
     const g=store.graves.find(x=>x.id===id);
     const box=el("div",{class:"confirm"}, el("div",{},`Obrisati „${title(g)}“?`), el("div",{class:"row"},
@@ -422,7 +408,7 @@ window.initMap = function(){
   $("pCancel").addEventListener("click", ()=>endPlace(false));
   $("pOk").addEventListener("click", ()=>{
     const editId=placeEditId;
-    if(editId){ const r=endPlace(false), g=store.graves.find(x=>x.id===editId); Object.assign(g,{lat:r.lat,lng:r.lng,w:r.w,l:r.l}); persist(); draw(g); openDetails(editId); return; }
+    if(editId){ const r=endPlace(false), g=store.graves.find(x=>x.id===editId); Object.assign(g,{lat:r.lat,lng:r.lng,w:r.w,l:r.l}); persist(); draw(g); selectGrave(editId); return; }
     const r=endPlace(true);
     openForm({id:uid(), title:"", people:[], inscription:"", note:"", photo:"", thumb:"", lat:r.lat, lng:r.lng, w:r.w, l:r.l, rot:r.rot, color:GRAVE_COLOR}, true);
   });
@@ -481,9 +467,10 @@ window.initMap = function(){
           Object.assign(g,{title:tIn.value.trim(), people:ppl, inscription:iIn.value.trim(), note:nIn.value.trim(), photo:ph.photo, thumb:ph.thumb}); if(ph.focus) g.focus=ph.focus;
           delete g.names; delete g.years; delete g.label;
           if(isNew){ if(preview){ preview.setMap(null); preview=null; } store.graves.push(g); }
-          persist(); draw(g); openDetails(g.id); }},"Spremi"),
+          persist(); draw(g); $("sheet").hidden=true; selectGrave(g.id); }},"Spremi"),
         isNew ? null : el("button",{class:"btn",type:"button",onclick:()=>startPlace(g, g.id)},"Premakni / veličina"),
-        el("button",{class:"btn",type:"button",onclick:()=>{ if(isNew) closeSheet(); else openDetails(g.id); }},"Odustani")));
+        el("button",{class:"btn",type:"button",onclick:()=>{ if(isNew) closeSheet(); else { $("sheet").hidden=true; selectGrave(g.id); } }},"Odustani"),
+        isNew ? null : el("button",{class:"btn danger",type:"button",onclick:()=>askDelete(g.id)},"Obriši")));
   }
 
   /* ---- list + export ---- */
