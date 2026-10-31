@@ -98,6 +98,9 @@ textarea{min-height:64px;resize:vertical}
 .confirm{border:1px solid var(--danger);border-radius:10px;padding:10px;display:flex;flex-direction:column;gap:8px}
 .ph-edit{display:flex;gap:10px;align-items:center}
 .ph-edit img{width:72px;height:72px;border-radius:10px;object-fit:cover}
+.me-wrap{position:absolute;width:0;height:0;pointer-events:none}
+.me-arrow{position:absolute;left:0;top:0;width:0;height:0}
+.me-arrow::before{content:"";position:absolute;left:-7px;top:-38px;border:7px solid transparent;border-top:0;border-bottom:20px solid #1a73e8;filter:drop-shadow(0 0 2px #fff) drop-shadow(0 1px 2px rgba(0,0,0,.5))}
 .me-ico{position:absolute;width:20px;height:20px;margin:-10px 0 0 -10px;border-radius:50%;background:#1a73e8;border:3px solid #fff;box-shadow:0 0 0 2px rgba(26,115,232,.35),0 1px 4px rgba(0,0,0,.5);pointer-events:none}
 .setup{position:absolute;inset:0;z-index:20;overflow:auto;background:var(--bg);padding:calc(24px + env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) 24px max(16px,env(safe-area-inset-left,0px))}
 .setup .box{max-width:560px;margin:0 auto;display:flex;flex-direction:column;gap:14px}
@@ -508,23 +511,35 @@ window.initMap = function(){
   }
 
   /* ---- GPS + guidance ---- */
-  let me=null, meDot=null, meCircle=null, watch=null, follow=false, target=null, line=null, heading=null;
+  let me=null, meDot=null, meCircle=null, meShown=null, watch=null, follow=false, target=null, line=null, heading=null;
+  const ARROW=el("div",{class:"me-arrow",hidden:"hidden"});
+  /* where the blue dot is drawn: your real position on the cemetery, otherwise the nearest point on the cemetery's edge */
+  const PAD=0.00015; // ~15 m around the cemetery still counts as "here"
+  function placeMe(){
+    const inside = me.lat>=CEMETERY.south-PAD && me.lat<=CEMETERY.north+PAD && me.lng>=CEMETERY.west-PAD && me.lng<=CEMETERY.east+PAD;
+    meShown = inside ? {lat:me.lat,lng:me.lng} : {lat:Math.min(CEMETERY.north,Math.max(CEMETERY.south,me.lat)), lng:Math.min(CEMETERY.east,Math.max(CEMETERY.west,me.lng))};
+    if(!meDot){ meCircle=new google.maps.Circle({map,center:me,radius:me.acc,strokeColor:"#1a73e8",strokeWeight:1,fillColor:"#1a73e8",fillOpacity:.15,clickable:false});
+      meDot=new HtmlPin(meShown, el("div",{class:"me-wrap"}, ARROW, el("div",{class:"me-ico"}))); meDot.setMap(map); }
+    else meDot.setPos(meShown);
+    meCircle.setCenter(me); meCircle.setRadius(me.acc); meCircle.setVisible(inside);
+    ARROW.hidden = inside;
+    if(!inside) ARROW.style.transform=`rotate(${dist(meShown,me).brg}deg)`;
+    return inside;
+  }
   function showGps(h){ $("gps").innerHTML=h; $("gps").hidden=false; }
   $("btnLocate").addEventListener("click", startGPS);
   map.addListener("dragstart", ()=>{ follow=false; $("btnLocate").classList.remove("on"); });
   function startGPS(){
     if(!navigator.geolocation){ showGps("Preglednik ne podržava lokaciju."); return; }
     follow=true; $("btnLocate").classList.add("on");
-    if(watch!=null){ if(me){ map.panTo(me); if(map.getZoom()<20) map.setZoom(20); } return; }
+    if(watch!=null){ if(meShown){ map.panTo(meShown); if(map.getZoom()<20) map.setZoom(20); } return; }
     showGps("Tražim lokaciju…");
     watch=navigator.geolocation.watchPosition(p=>{
       const first=!me; me={lat:p.coords.latitude,lng:p.coords.longitude,acc:p.coords.accuracy};
-      if(!meDot){ meCircle=new google.maps.Circle({map,center:me,radius:me.acc,strokeColor:"#1a73e8",strokeWeight:1,fillColor:"#1a73e8",fillOpacity:.15,clickable:false});
-        meDot=new HtmlPin(me, el("div",{class:"me-ico"})); meDot.setMap(map); }
-      else { meDot.setPos(me); meCircle.setCenter(me); meCircle.setRadius(me.acc); }
-      const far = !(me.lat>BOUNDS.south && me.lat<BOUNDS.north && me.lng>BOUNDS.west && me.lng<BOUNDS.east);
-      showGps(`GPS točnost ±<b>${Math.round(me.acc)} m</b>`+(far?" · niste na groblju":""));
-      if(follow){ map.panTo(me); if(first && map.getZoom()<20) map.setZoom(20); }
+      const inside=placeMe();
+      if(inside) showGps(`GPS točnost ±<b>${Math.round(me.acc)} m</b>`);
+      else { const d=dist(meShown,me).d; showGps(`Niste na groblju · udaljeni ste <b>${d<1000?Math.round(d)+" m":(d/1000).toFixed(1).replace(".",",")+" km"}</b>`); }
+      if(follow){ map.panTo(meShown); if(first && map.getZoom()<20) map.setZoom(20); }
       updateGuide();
     }, e=>showGps(e.code===1 ? (window.isSecureContext ? "Pristup lokaciji je odbijen." : "Lokacija radi samo kad je stranica otvorena preko https://.") : "Lokacija nije dostupna."),
     {enableHighAccuracy:true, maximumAge:1000, timeout:20000});
