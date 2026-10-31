@@ -377,8 +377,11 @@ window.initMap = function(){
     const m=$("map").getBoundingClientRect(), padT=70, padB=12, pad=12;
     let r=n.getBoundingClientRect();
     const anchorY=r.bottom+12, above=anchorY-12-(m.top+padT), below=(m.bottom-padB)-(anchorY+12);
-    if(r.height>above && below>above) n.classList.add("below");
-    const room=Math.max(above,below);
+    const phH=ph?ph.getBoundingClientRect().height:0, bH=body.getBoundingClientRect().height;
+    const minH=r.height-Math.max(0,phH-110)-Math.max(0,bH-80);           // smallest the card can get by shrinking
+    const flip = r.height>above && minH>above && below>above;          // open below only if it cannot fit above at all
+    if(flip) n.classList.add("below");
+    const room=flip?below:above;
     let excess=r.height-room;
     if(excess>0 && ph){ const h=ph.getBoundingClientRect().height, nh=Math.max(110, h-excess); n.style.setProperty("--ph", nh+"px"); excess-=h-nh; }
     if(excess>0) body.style.maxHeight=Math.max(80, body.getBoundingClientRect().height-excess)+"px";
@@ -415,25 +418,35 @@ window.initMap = function(){
   function openCallout(g, fromList){
     const n=callout.node, body=n.querySelector(".co-b"), tok=++openTok;
     if(!callout.getMap() || !body) return;
-    n.style.marginLeft="0px"; n.style.removeProperty("--ph"); n.style.setProperty("--ax","50%"); body.style.maxHeight="";
-    const m=$("map").getBoundingClientRect(), h=n.offsetHeight, TOP=70, PAD=12;
+    n.style.marginLeft="0px"; n.style.removeProperty("--ph"); n.style.setProperty("--ax","50%"); body.style.maxHeight=""; n.classList.remove("below");
+    const TOP=70, PAD=12;
     const show=()=>{ if(tok!==openTok) return; fitCallout(); n.classList.remove("pending"); void n.offsetWidth; n.classList.add("pop"); };
-    const settle=()=>{ let done=false; const go=()=>{ if(!done){ done=true; show(); } }; const l=map.addListener("idle", ()=>{ l.remove(); go(); }); setTimeout(go, 600); };
+    const settle=f=>{ let done=false; const go=()=>{ if(!done && tok===openTok){ done=true; f(); } }; const l=map.addListener("idle", ()=>{ l.remove(); go(); }); setTimeout(go, 700); };
+    /* measure where the card and grave really are on screen and pan so that both are visible (card above the grave) */
+    const step=k=>{
+      if(tok!==openTok || !callout.getMap()) return;
+      callout.draw();
+      const pr=projOv.getProjection(), m=$("map").getBoundingClientRect(), r=n.getBoundingClientRect();
+      const a=pr.fromLatLngToDivPixel(new google.maps.LatLng(topOf(g))), b=pr.fromLatLngToDivPixel(new google.maps.LatLng(g)), gh=Math.max(0,2*(b.y-a.y));
+      const top=r.top-m.top, bot=r.bottom-m.top, left=r.left-m.left, right=r.right-m.left, gTop=bot+12, gBot=gTop+gh;
+      let dx=0, dy=0;
+      if(fromList){                                        // grave in the middle; lower only as much as the card needs
+        const want=Math.min(Math.max(m.height/2, TOP+r.height+12+gh/2+6), m.height-gh/2-PAD);
+        dx=(left+right)/2-m.width/2; dy=(gTop+gh/2)-want;
+      } else {                                             // like a Google Maps info window: move only as much as needed
+        if(left<PAD) dx=left-PAD; else if(right>m.width-PAD) dx=right-(m.width-PAD);
+        if(top<TOP) dy=top-TOP; else if(gBot>m.height-PAD) dy=Math.min(gBot-(m.height-PAD), top-TOP);
+      }
+      if(k<3 && (Math.abs(dx)>2 || Math.abs(dy)>2)){ map.panBy(dx, dy); settle(()=>step(k+1)); } else show();
+    };
     if(fromList){
-      const z=Math.max(map.getZoom(), 20.5), mpp=156543.03392*Math.cos(g.lat*Math.PI/180)/Math.pow(2,z);
-      const half=(topOf(g).lat-g.lat)*M_LAT/mpp;                          // half the grave's height in px
-      let y=Math.max(m.height/2, TOP+h+12+half+6);                        // grave centre, px from the map's top
-      y=Math.min(y, m.height-half-PAD);
-      map.moveCamera({center:{lat:g.lat+(y-m.height/2)*mpp/M_LAT, lng:g.lng}, zoom:z});
-      settle(); return;
-    }
-    const r=n.getBoundingClientRect(), anchor=r.bottom+12, gh=(()=>{ const pr=projOv.getProjection(); if(!pr) return 0;
-      const a=pr.fromLatLngToDivPixel(new google.maps.LatLng(topOf(g))), b=pr.fromLatLngToDivPixel(new google.maps.LatLng(g)); return 2*(b.y-a.y); })();
-    let dx=0, dy=0;
-    if(r.left<m.left+PAD) dx=r.left-(m.left+PAD); else if(r.right>m.right-PAD) dx=r.right-(m.right-PAD);
-    if(r.top<m.top+TOP) dy=r.top-(m.top+TOP); else if(anchor+gh>m.bottom-PAD) dy=Math.min(anchor+gh-(m.bottom-PAD), r.top-(m.top+TOP));
-    if(Math.abs(dx)>1 || Math.abs(dy)>1){ map.panBy(dx, dy); settle(); } else show();
+      const z=Math.max(map.getZoom(), 20.5), mpp=156543.03392*Math.cos(g.lat*Math.PI/180)/Math.pow(2,z), m=$("map").getBoundingClientRect();
+      const half=(topOf(g).lat-g.lat)*M_LAT/mpp, y=Math.min(Math.max(m.height/2, TOP+n.offsetHeight+12+half+6), m.height-half-PAD);
+      map.moveCamera({center:{lat:g.lat+(y-m.height/2)*mpp/M_LAT, lng:g.lng}, zoom:z});   // first guess; step() corrects it
+      settle(()=>step(1));
+    } else step(1);
   }
+
   function deselect(){ const s=selected; selected=null; openTok++; callout.setMap(null); redraw(s); }
   map.addListener("click", ()=>{ if(!placeG) deselect(); });
 
