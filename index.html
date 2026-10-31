@@ -36,7 +36,7 @@ img{display:block}
 /* design 2: photo 3x3 units, dark name strip (1 unit tall, at least 5 wide) along its top third.
    The label is placed so the grave sits in the corner under the strip, right of the photo, with a gap. */
 .pin{--u:21px;--gap:6px;position:absolute;transform:translate(calc(var(--u)*-3 - var(--gap)),calc(var(--u)*-1 - var(--gap)));display:block;width:calc(var(--u)*3);height:calc(var(--u)*3);padding:0;border:0;background:none;color:#fff;font:600 12px/1 var(--font);text-align:left}
-.pin img{width:100%;height:100%;border-radius:7px 0 7px 7px;object-fit:cover;box-shadow:0 1px 6px rgba(0,0,0,.6)}
+.pin img{width:100%;height:100%;box-sizing:border-box;border:2px solid #000;border-radius:7px 0 7px 7px;object-fit:cover;box-shadow:0 1px 6px rgba(0,0,0,.6)}
 .pin span{position:absolute;left:100%;top:0;height:var(--u);line-height:var(--u);width:max-content;min-width:calc(var(--u)*5);max-width:calc(var(--u)*11);padding:0 8px;background:rgba(22,24,20,.88);border-radius:0 7px 7px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;box-sizing:border-box}
 .pin.noimg{width:auto;height:var(--u);transform:translate(calc(-100% - var(--gap)),calc(var(--u)*-1 - var(--gap)))}
 .pin.noimg span{position:static;display:block;border-radius:8px}
