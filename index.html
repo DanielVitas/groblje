@@ -42,9 +42,12 @@ img{display:block}
 .pin.dim{visibility:hidden}
 
 /* callout that pops up next to the selected grave */
-.callout{position:absolute;z-index:5;width:min(300px,calc(100vw - 24px));transform:translate(-50%,calc(-100% - 12px));background:var(--panel);color:var(--fg);border-radius:14px;box-shadow:0 6px 24px rgba(0,0,0,.45);font:14px/1.35 var(--font);cursor:default}
-.callout::after{content:"";position:absolute;left:50%;bottom:-8px;margin-left:-9px;border:9px solid transparent;border-bottom:0;border-top-color:var(--panel)}
-.co-ph{display:block;width:100%;height:min(260px,34vh);padding:0;border:0;border-radius:14px 14px 0 0;overflow:hidden;background:#333;position:relative}
+.callout{--ph:min(260px,34vh);--ax:50%;position:absolute;z-index:5;width:min(300px,calc(100vw - 24px));transform:translate(-50%,calc(-100% - 12px));background:var(--panel);color:var(--fg);border-radius:14px;box-shadow:0 6px 24px rgba(0,0,0,.45);font:14px/1.35 var(--font);cursor:default}
+.callout::after{content:"";position:absolute;left:var(--ax);bottom:-8px;margin-left:-9px;border:9px solid transparent;border-bottom:0;border-top-color:var(--panel)}
+.callout.below{transform:translate(-50%,12px)}
+.callout.below::after{bottom:auto;top:-8px;border-top:0;border-bottom:9px solid var(--panel)}
+.co-b{overflow-y:auto}
+.co-ph{display:block;width:100%;height:var(--ph);padding:0;border:0;border-radius:14px 14px 0 0;overflow:hidden;background:#333;position:relative}
 .co-ph img{width:100%;height:100%;object-fit:cover}
 .zoomhint{position:absolute;right:8px;bottom:8px;background:rgba(0,0,0,.55);color:#fff;border-radius:6px;font-size:12px;padding:2px 7px}
 .co-b{padding:10px 12px 12px;display:flex;flex-direction:column;gap:3px}
@@ -56,7 +59,7 @@ img{display:block}
 .co-b .row{margin-top:7px}
 .co-insc{margin:6px 0 0;padding:2px 0 2px 10px;border-left:3px solid var(--accent);font:italic 14px/1.4 var(--serif)}
 .co-insc div+div{margin-top:2px}
-.co-x{position:absolute;right:6px;top:calc(min(260px,34vh) + 6px);border:0;background:transparent;color:var(--muted);font-size:18px;padding:2px 6px}
+.co-x{position:absolute;right:6px;top:calc(var(--ph) + 6px);border:0;background:transparent;color:var(--muted);font-size:18px;padding:2px 6px}
 .callout.nophoto .co-x{top:6px}
 
 .sheet{position:absolute;z-index:12;left:0;right:0;bottom:0;background:var(--panel);border-radius:16px 16px 0 0;box-shadow:0 -4px 20px rgba(0,0,0,.25);max-height:82%;display:flex;flex-direction:column;padding-bottom:env(safe-area-inset-bottom,0px)}
@@ -361,12 +364,24 @@ window.initMap = function(){
 
   /* ---- callout: pops up next to the selected grave ---- */
   const callout = new HtmlPin(null, el("div",{class:"callout"}), true);
+  /* keep the pop-up fully on screen without moving the map: open it below the grave when there is more room there,
+     shrink the photo (and then scroll the text) if it is still too tall, and slide it sideways at the screen edges */
   function fitCallout(){
-    const r=callout.node.getBoundingClientRect(), m=$("map").getBoundingClientRect(), pad=12, top=70;
-    let dx=0, dy=0;
-    if(r.top < m.top+top) dy = r.top-(m.top+top);
-    if(r.left < m.left+pad) dx = r.left-(m.left+pad); else if(r.right > m.right-pad) dx = r.right-(m.right-pad);
-    if(dx||dy) map.panBy(dx,dy);
+    const n=callout.node, body=n.querySelector(".co-b"), ph=n.querySelector(".co-ph");
+    if(!callout.getMap() || !body) return;
+    n.classList.remove("below"); n.style.marginLeft="0px"; n.style.removeProperty("--ph"); n.style.setProperty("--ax","50%"); body.style.maxHeight="";
+    const m=$("map").getBoundingClientRect(), padT=70, padB=12, pad=12;
+    let r=n.getBoundingClientRect();
+    const anchorY=r.bottom+12, above=anchorY-12-(m.top+padT), below=(m.bottom-padB)-(anchorY+12);
+    if(r.height>above && below>above) n.classList.add("below");
+    const room=Math.max(above,below);
+    let excess=r.height-room;
+    if(excess>0 && ph){ const h=ph.getBoundingClientRect().height, nh=Math.max(110, h-excess); n.style.setProperty("--ph", nh+"px"); excess-=h-nh; }
+    if(excess>0) body.style.maxHeight=Math.max(80, body.getBoundingClientRect().height-excess)+"px";
+    r=n.getBoundingClientRect();
+    let shift=0;
+    if(r.left<m.left+pad) shift=(m.left+pad)-r.left; else if(r.right>m.right-pad) shift=(m.right-pad)-r.right;
+    if(shift){ n.style.marginLeft=shift+"px"; n.style.setProperty("--ax", `calc(50% - ${shift}px)`); }
   }
   function selectGrave(id, pan){
     const g=store.graves.find(x=>x.id===id); if(!g) return;
@@ -390,6 +405,7 @@ window.initMap = function(){
     if(!callout.getMap()) callout.setMap(map); else callout.draw();
     redraw(prev, id);
   }
+  map.addListener("idle", ()=>{ if(callout.getMap()) fitCallout(); });
   function deselect(){ const s=selected; selected=null; callout.setMap(null); redraw(s); }
   map.addListener("click", ()=>{ if(!placeG) deselect(); });
 
